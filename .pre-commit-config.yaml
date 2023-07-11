@@ -1,0 +1,104 @@
+---
+repos:
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v4.4.0
+      hooks:
+          - id: trailing-whitespace
+          - id: check-merge-conflict
+          - id: check-symlinks
+          - id: check-yaml
+          - id: destroyed-symlinks
+          - id: end-of-file-fixer
+          - id: requirements-txt-fixer
+          - id: sort-simple-yaml
+
+    - repo: https://github.com/pre-commit/mirrors-mypy
+      rev: v1.4.1
+      hooks:
+          - id: mypy
+    - repo: https://github.com/asottile/setup-cfg-fmt
+      rev: v2.4.0
+      hooks:
+          - id: setup-cfg-fmt
+    - repo: https://github.com/jumanjihouse/pre-commit-hooks
+      rev: 3.0.0
+      hooks:
+          - id: forbid-binary
+          - id: git-check
+          - id: git-dirty
+          - id: markdownlint
+    - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
+      rev: 0.2.3
+      hooks:
+          - id: yamlfmt
+    - repo: https://github.com/Lucas-C/pre-commit-hooks
+      rev: v1.5.1
+      hooks:
+          - id: forbid-crlf
+          - id: forbid-tabs
+    - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
+      rev: v1.3.1
+      hooks:
+          - id: python-safety-dependencies-check
+    - repo: https://github.com/detailyang/pre-commit-shell
+      rev: v1.0.6
+      hooks:
+          - id: shell-lint
+    - repo: https://github.com/lovesegfault/beautysh
+      rev: v6.2.1
+      hooks:
+          - id: beautysh
+    - repo: https://github.com/psf/black
+      rev: 23.7.0
+      hooks:
+          - id: black
+          - id: black-jupyter
+    - repo: local
+      hooks:
+          - id: talisman-precommit
+            name: talisman
+            entry: bash -c 'if [ -n "${TALISMAN_HOME:-}" ]; then ${TALISMAN_HOME}/talisman_hook_script pre-commit; else echo "TALISMAN does not exist. Consider
+                installing from https://github.com/thoughtworks/talisman . If you already have talisman installed, please ensure TALISMAN_HOME variable
+                is set to where talisman_hook_script resides, for example, TALISMAN_HOME=${HOME}/.talisman/bin"; fi'
+            language: system
+            pass_filenames: false
+            types: [text]
+            verbose: true
+    - repo: https://github.com/PyCQA/bandit
+      rev: 1.7.5
+      hooks:
+          - id: bandit
+    - repo: https://github.com/PyCQA/pydocstyle
+      rev: 6.3.0
+      hooks:
+          - id: pydocstyle
+    - repo: https://github.com/pylint-dev/pylint
+      rev: v3.0.0a6
+      hooks:
+          - id: pylint
+    - repo: https://github.com/PyCQA/isort
+      rev: 5.12.0
+      hooks:
+          - id: isort
+    - repo: https://gitlab.com/iamlikeme/nbhooks
+      rev: 1.0.0
+      hooks:
+          - id: nb-ensure-clean
+    - repo: https://github.com/markdownlint/markdownlint
+      rev: v0.12.0
+      hooks:
+          - id: markdownlint
+    - repo: https://github.com/nbQA-dev/nbQA
+      rev: 1.7.0
+      hooks:
+          - id: nbqa-black
+          - id: nbqa-pylint
+          - id: nbqa-mypy
+    - repo: https://github.com/shssoichiro/oxipng
+      rev: v8.0.0
+      hooks:
+          - id: oxipng
+    - repo: https://github.com/bagerard/graphviz-dot-hooks
+      rev: v0.1.0
+      hooks:
+          - id: check-dot
