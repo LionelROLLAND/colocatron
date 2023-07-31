@@ -23,10 +23,10 @@ def general_weight_fun(
     match proportional:
         case True:
             assert isinstance(weight_per_coloc, float)  # nosec
-            weight = weight_per_coloc / coloc_needed
+            weight = n_virt_coloc * weight_per_coloc / coloc_needed
         case False:
             assert isinstance(total_weight, float)  # nosec
-            weight = total_weight
+            weight = total_weight / coloc_needed
     return coloc_needed, weight
 
 
