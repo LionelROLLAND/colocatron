@@ -50,6 +50,17 @@ class Presence:
         self.__absences_begin_on: date = start
         self.__absences_before_begin: int = 0
 
+    # Needs typing
+    @classmethod
+    def from_json_object(cls, json_obj):
+        """Return a TaskHistory instance from an object extracted from a json."""
+        raise NotImplementedError("Implement me !")
+
+    # Needs typing
+    def to_json_object(self):
+        """Return an object that stores the data of the class and that can be put in a json."""
+        raise NotImplementedError("Implement me !")
+
     def set_absence_check(self, day: date) -> None:
         """Raise an error if an absence can not be added/removed for the date day."""
         if not isinstance(day, date):
@@ -280,6 +291,17 @@ class TaskHistory:
         self.__last_time: date = date(year=9999, month=12, day=31)
         self.__dates: dict[date, float] = {}
 
+    # Needs typing
+    @classmethod
+    def from_json_object(cls, json_obj):
+        """Return a TaskHistory instance from an object extracted from a json."""
+        raise NotImplementedError("Implement me !")
+
+    # Needs typing
+    def to_json_object(self):
+        """Return an object that stores the data of the class and that can be put in a json."""
+        raise NotImplementedError("Implement me !")
+
     def set_date_check(self, day: date) -> None:
         """Raise an error if a date cannot be added/removed for the date day."""
         if not isinstance(day, date):
@@ -364,7 +386,6 @@ class TaskHistory:
         ):
             raise self.unsafe_rm_date_error
 
-    # Handle the case when the instance is reset ! (when self.__ever_done becomes False)
     def rm_date(self, period: date | TypeIterable[date]):
         """Remove a period on which the task was done."""
         if isinstance(period, date):
@@ -495,6 +516,10 @@ class TaskHistory:
         if self.__n_until_begin == 0 and len(self.__dates) == 0:
             self.__ever_done = False
             self.__last_time = date(year=9999, month=12, day=31)
+
+    def forward_begin_to(self, day: date) -> None:
+        """Reduce the data stored by setting `self.__begin_on` later."""
+        raise NotImplementedError("Implement me !")
 
 
 # class TaskRecorder:
