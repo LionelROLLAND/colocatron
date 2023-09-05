@@ -1,10 +1,10 @@
 """Provide a Presence class to represent the days of presence/absence of a coloc."""
 
 # import zoneinfo
-import logging
 from collections.abc import Iterable as ClassIterable
 from datetime import date
 from typing import Iterable as TypeIterable
+from typing import Optional
 
 from constants import ONE_DAY
 from utils import period_type_error
@@ -16,15 +16,12 @@ class Presence:
     class InvalidDayError(ValueError):
         """Raised when setting an absence on an incorrect day for a Presence Instance."""
 
-    class BeforeStartDayError(InvalidDayError):
-        """Raised when setting an absence before the start of a Presence instance."""
-
-    class StartToReliableDayError(InvalidDayError):
+    class BeforeAbsenceBeginError(InvalidDayError):
         """
         Raised when setting an absence on an incorrect period of a Presence instance.
 
-        The incorrect period is the one between the starting date of the Presence instance
-        and the day since which the absences are recorded day by day (Presence.__absences_begin_on).
+        The incorrect period is the one before the day since which the absences are
+        recorded day by day (Presence.__absences_begin_on).
         """
 
     class AbsenceTrackingAfterBeginError(InvalidDayError):
@@ -37,9 +34,8 @@ class Presence:
     def __init__(self, start: date) -> None:
         """Initialize an empty Presence instance."""
         self.__absences: set[date] = set()
-        self.__start: date = start
         self.__absences_begin_on: date = start
-        self.__absences_before_begin: int = 0
+        self.__presences_before_begin: int = 0
 
     # Needs typing
     @classmethod
@@ -52,29 +48,23 @@ class Presence:
         """Return an object that stores the data of the class and that can be put in a json."""
         raise NotImplementedError("Implement me !")
 
-    def set_absence_check(self, day: date) -> None:
+    def ask_or_set_absence_check(self, day: date) -> None:
         """Raise an error if an absence can not be added/removed for the date day."""
         if not isinstance(day, date):
             raise period_type_error(day)
-        if day < self.__start:
-            raise self.BeforeStartDayError(
-                "Trying to set an absence before the start of the Presence instance."
-            )
         if day < self.__absences_begin_on:
-            raise self.StartToReliableDayError(
-                "Trying to set an absence between the start "
-                "of the Presence instance and the start of "
-                "the reliability of the absences."
+            raise self.BeforeAbsenceBeginError(
+                "Trying to set/ask for an absence before the start of the absences recording."
             )
 
     def add_absence(self, period: date | TypeIterable[date]) -> None:
         """Add the absences defined by period."""
         if isinstance(period, date):
-            self.set_absence_check(period)
+            self.ask_or_set_absence_check(period)
             self.__absences.add(period)
         elif isinstance(period, ClassIterable):
             for day in period:
-                self.set_absence_check(day)
+                self.ask_or_set_absence_check(day)
             self.__absences.update(period)
         else:
             raise period_type_error(period)
@@ -88,149 +78,94 @@ class Presence:
 
     def on_period(self, period: date | TypeIterable[date]) -> bool:
         """Return True if present on period."""
-        type_error = TypeError(
-            f"Incorrect type for a period : Expected date | Iterable[date], got {period}."
-        )
         if isinstance(period, date):
-            return self.on_period([period])
+            self.ask_or_set_absence_check(period)
+            return period not in self.__absences
         if isinstance(period, ClassIterable):
             present: bool = True
             for day in period:
-                if not isinstance(day, date):
-                    raise type_error
-                if day < self.__start:
-                    logging.warning(
-                        "Asking for the presence before the start of a presence instance."
-                    )
-                    present = False
-                elif day < self.__absences_begin_on:
-                    raise self.StartToReliableDayError(
-                        "Asking for the presence between the start "
-                        "of the Presence instance and the start of "
-                        "the reliability of the absences."
-                    )
-                elif day in self.__absences:
+                self.ask_or_set_absence_check(day)
+                if day in self.__absences:
                     present = False
             return present
-        raise type_error
+        raise period_type_error(period)
 
     def not_on_period(self, period: date | TypeIterable[date]) -> bool:
         """Return True if absent on period."""
-        type_error = TypeError(
-            f"Incorrect type for a period : Expected date | Iterable[date], got {period}."
-        )
         if isinstance(period, date):
-            return self.not_on_period([period])
+            self.ask_or_set_absence_check(period)
+            return period in self.__absences
         if isinstance(period, ClassIterable):
             absent: bool = True
             for day in period:
-                if not isinstance(day, date):
-                    raise type_error
-                if day < self.__start:
-                    logging.warning(
-                        "Asking for the presence before the start of a presence instance."
-                    )
-                elif day < self.__absences_begin_on:
-                    raise self.StartToReliableDayError(
-                        "Asking for the presence between the start "
-                        "of the Presence instance and the start of "
-                        "the reliability of the absences."
-                    )
-                elif day not in self.__absences:
+                self.ask_or_set_absence_check(day)
+                if day not in self.__absences:
                     absent = False
             return absent
-        raise type_error
+        raise period_type_error(period)
 
     def days_nb_until(self, day: date) -> int:
         """Return the number of days of presence until day (included)."""
-        if day < self.__start:
-            logging.warning(
-                "Asking for the presence before the start of a presence instance."
-            )
-            return 0
-        if day < self.__absences_begin_on:
-            raise self.StartToReliableDayError(
-                "Asking for the presence between the start "
-                "of the Presence instance and the start of "
-                "the reliability of the absences."
-            )
-        nb_days = (day - self.__start).days + 1
+        self.ask_or_set_absence_check(day)
+        nb_days_after_begin = (day - self.__absences_begin_on).days + 1
         nb_abs = sum(1 for _ in filter(lambda absence: absence <= day, self.__absences))
-        return nb_days - nb_abs - self.__absences_before_begin
+        return nb_days_after_begin - nb_abs + self.__presences_before_begin
 
     def rm_absence(self, period: date | TypeIterable[date]) -> None:
         """
         Remove the absences defined by period.
 
-        Said in another words, set period as a presence period.
+        Said in other words, set period as a presence period.
         """
-        type_error = TypeError(
-            f"Incorrect type for an absence : Expected date | Iterable[date], got {period}."
-        )
         if isinstance(period, date):
-            self.rm_absence([period])
+            self.ask_or_set_absence_check(period)
+            self.__absences.discard(period)
         elif isinstance(period, ClassIterable):
             buffer: set[date] = set()
             for day in period:
-                if not isinstance(day, date):
-                    raise type_error
-                if day < self.__start:
-                    raise self.BeforeStartDayError(
-                        "Trying to set an absence before the start "
-                        "of the Presence instance."
-                    )
-                if day < self.__absences_begin_on:
-                    raise self.StartToReliableDayError(
-                        "Trying to set an absence between the start "
-                        "of the Presence instance and the start of "
-                        "the reliability of the absences."
-                    )
+                self.ask_or_set_absence_check(day)
                 buffer.add(day)
             self.__absences -= buffer
         else:
-            raise type_error
+            raise period_type_error(period)
 
-    def set_absence_nb_between(self, start: date, end: date, abs_nb: int) -> None:
+    def set_presence_nb_between(
+        self, until: date, pres_nb: int, start: Optional[date] = None
+    ) -> None:
         """
         Set the absences number between start and end (included).
 
         Update self.__absences_begin_on and self.__absences.
         """
-        if end < start:
+        if until < self.__absences_begin_on:
             raise ValueError(
-                "end date before start date in Presence.set_absence_nb_between(start, end, nb_abs)."
+                "Trying to set global information until a date that is before "
+                "the beginning of the absences recording."
             )
-        if start < self.__start:
-            raise self.BeforeStartDayError(
-                "Trying to set an absence before the start of the Presence instance."
-            )
-        if (
-            self.__start < start < self.__absences_begin_on
-            or end < self.__absences_begin_on
-        ):
-            raise self.StartToReliableDayError(
-                "Trying to set an absence between the start "
-                "of the Presence instance and the start of "
-                "the reliability of the absences."
-            )
-        if start > self.__absences_begin_on:
-            raise self.AbsenceTrackingAfterBeginError(
-                "Trying to set the number of absences on a period "
-                "such that it creates holes in the absences tracking."
-            )
-        if start == self.__start:
-            self.__absences_before_begin = abs_nb
-        elif start == self.__absences_begin_on:
-            self.__absences_before_begin += abs_nb
+        if start is not None:
+            if start > until:
+                raise ValueError(
+                    'End date ("until") sooner than start date in the method '
+                    "Presence.set_presence_nb_between."
+                )
+            if start > self.__absences_begin_on:
+                raise self.AbsenceTrackingAfterBeginError(
+                    "Trying to set the number of absences on a period "
+                    "such that it creates holes in the absences tracking."
+                )
+            if start < self.__absences_begin_on and self.__presences_before_begin != 0:
+                raise ValueError(
+                    "Trying to set global information starting before the beginning "
+                    "of the absences recording for a Presence instancethat is such that "
+                    "there is already some presence information for before the beginning "
+                    "of the absences recording."
+                )
+        if start is None or start < self.__absences_begin_on:
+            self.__presences_before_begin = pres_nb
         else:
-            raise ValueError(
-                "The start date in "
-                "Presence.set_absence_nb_between(start, end, nb_abs) "
-                "is not valid. No more information since this error "
-                "was not supposed to happen and was not catched before."
-            )
-        self.__absences_begin_on = end + ONE_DAY
-        self.__absences -= set(filter(lambda day: day <= end, self.__absences))  # type: ignore
+            self.__presences_before_begin += pres_nb
+        self.__absences_begin_on = until + ONE_DAY
+        self.__absences -= set(filter(lambda day: day <= until, self.__absences))  # type: ignore
         # I wanted to do it like this:
         #
         # self.__absences.difference_update(filter(lambda day: day <= end, self.__absences))

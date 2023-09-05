@@ -205,28 +205,26 @@ class TaskHistory:
                     'some date "last time" on that same period is provided, which '
                     "should at least count for one day."
                 )
-        if start is not None and start > until:
-            raise ValueError(
-                'End date ("until") sooner than start date in the method '
-                "TaskHistory.set_situation_on_period."
-            )
-        if start is not None and start > self.__begin_on:
-            raise ValueError(
-                "Setting global information on a period such that it creates holes "
-                "in the task history."
-            )
-        if (
-            start is not None
-            and start < self.__begin_on
-            and self.__n_until_begin != 0
-            and self.__load_until_begin != 0
-        ):
-            raise self.BeforeBeginError(
-                "Trying to set global information starting before the beginning "
-                "of the precise task recording for a task history that is such that "
-                "there is already some history information for before the beginning "
-                "of the precise recording."
-            )
+        if start is not None:
+            if start > until:
+                raise ValueError(
+                    'End date ("until") sooner than start date in the method '
+                    "TaskHistory.set_situation_on_period."
+                )
+            if start > self.__begin_on:
+                raise ValueError(
+                    "Setting global information on a period such that it creates holes "
+                    "in the task history."
+                )
+            if start < self.__begin_on and (
+                self.__n_until_begin != 0 or self.__load_until_begin != 0
+            ):
+                raise self.BeforeBeginError(
+                    "Trying to set global information starting before the beginning "
+                    "of the precise task recording for a task history that is such that "
+                    "there is already some history information for before the beginning "
+                    "of the precise recording."
+                )
 
     # pylint: disable=too-many-arguments
     def set_situation_on_period(
@@ -249,7 +247,7 @@ class TaskHistory:
             last_time_between_start_and_until=last_time_between_start_and_until,
             start=start,
         )
-        if start is None:
+        if start is None or start < self.__begin_on:
             self.__n_until_begin = n_days
             self.__load_until_begin = load
         else:
