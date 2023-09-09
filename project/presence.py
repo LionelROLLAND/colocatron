@@ -1,8 +1,8 @@
 """Provide a Presence class to represent the days of presence/absence of a coloc."""
 
-# import zoneinfo
 from collections.abc import Iterable as ClassIterable
 from datetime import date
+from typing import Generator
 from typing import Iterable as TypeIterable
 from typing import Optional
 
@@ -76,7 +76,7 @@ class Presence:
         pres.add_absence(absences)
         return pres
 
-    def on_period(self, period: date | TypeIterable[date]) -> bool:
+    def on_all_of(self, period: date | TypeIterable[date]) -> bool:
         """Return True if present on period."""
         if isinstance(period, date):
             self.ask_or_set_absence_check(period)
@@ -90,7 +90,7 @@ class Presence:
             return present
         raise period_type_error(period)
 
-    def not_on_period(self, period: date | TypeIterable[date]) -> bool:
+    def on_no_one_of(self, period: date | TypeIterable[date]) -> bool:
         """Return True if absent on period."""
         if isinstance(period, date):
             self.ask_or_set_absence_check(period)
@@ -104,6 +104,40 @@ class Presence:
             return absent
         raise period_type_error(period)
 
+    def on_any_of(self, period: date | TypeIterable[date]) -> bool:
+        """Return True if present on any of the days in period."""
+        return not self.on_no_one_of(period)
+
+    def on_not_all_of(self, period: date | TypeIterable[date]) -> bool:
+        """Return True if absent on any of the days in period."""
+        return not self.on_all_of(period)
+
+    def days_between(self, start: date, end: date) -> Generator[date, None, None]:
+        """Iterate over the days of presence between start and end (included)."""
+        self.ask_or_set_absence_check(start)
+        if end < start:
+            raise ValueError("end < start in Presence.days_between(self, start, end)")
+
+        current_day = start
+        while current_day <= end:
+            if current_day not in self.__absences:
+                yield current_day
+            current_day += ONE_DAY
+
+    def days_in(self, period: date | TypeIterable[date]) -> Generator[date, None, None]:
+        """Iterate over the days of presence that are also in period."""
+        if isinstance(period, date):
+            if self.on_all_of(period):
+                yield period
+        elif isinstance(period, ClassIterable):
+            for day in period:
+                if not isinstance(day, date):
+                    raise period_type_error(period)
+                if self.on_all_of(day):
+                    yield day
+        else:
+            raise period_type_error(period)
+
     def days_nb_until(self, day: date) -> int:
         """Return the number of days of presence until day (included)."""
         self.ask_or_set_absence_check(day)
@@ -111,7 +145,7 @@ class Presence:
         nb_abs = sum(1 for _ in filter(lambda absence: absence <= day, self.__absences))
         return nb_days_after_begin - nb_abs + self.__presences_before_begin
 
-    def rm_absence(self, period: date | TypeIterable[date]) -> None:
+    def discard_absence(self, period: date | TypeIterable[date]) -> None:
         """
         Remove the absences defined by period.
 

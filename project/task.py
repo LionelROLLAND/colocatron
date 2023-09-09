@@ -1,18 +1,25 @@
 """Class that represents a task."""
 
 from math import ceil
-from typing import Callable, Union
+from typing import Callable, Optional
+
+from utils import UniqueId
 
 
+# pylint: disable=too-few-public-methods
+class TaskId(UniqueId):
+    """A class to make unique task IDs."""
+
+
+# The error management for this function could be improved maybe
 # pylint: disable=too-many-arguments
 def general_weight_fun(
     _: int,
     n_coloc_days: float,
-    proportional: bool = True,
     min_prop: float = 0,
     min_nb_coloc: int = 0,
-    weight_per_coloc: Union[float, None] = None,
-    total_weight: Union[float, None] = None,
+    weight_per_coloc: Optional[float] = None,
+    total_weight: Optional[float] = None,
 ) -> tuple[int, float]:
     """
     Return the number of colocs needed for one task and how tedious it is.
@@ -22,13 +29,16 @@ def general_weight_fun(
     """
     n_virt_coloc = n_coloc_days / 7
     coloc_needed = max(1, int(ceil(min_prop * n_virt_coloc)), min_nb_coloc)
-    match proportional:
-        case True:
-            assert isinstance(weight_per_coloc, float)  # nosec
-            weight = n_virt_coloc * weight_per_coloc / coloc_needed
-        case False:
-            assert isinstance(total_weight, float)  # nosec
-            weight = total_weight / coloc_needed
+    match isinstance(weight_per_coloc, float), isinstance(total_weight, float):
+        case True, False:
+            weight = n_virt_coloc * weight_per_coloc / coloc_needed  # type: ignore
+        case False, True:
+            weight = total_weight / coloc_needed  # type: ignore
+        case _:
+            raise ValueError(
+                "Expected weight_per_coloc xor total_weight to be provided, "
+                "got none of them or the 2 of them"
+            )
     return coloc_needed, weight
 
 
@@ -36,8 +46,8 @@ def weight_fun(
     proportional: bool = True,
     min_prop: float = 0,
     min_nb_coloc: int = 0,
-    weight_per_coloc: Union[float, None] = None,
-    total_weight: Union[float, None] = None,
+    weight_per_coloc: Optional[float] = None,
+    total_weight: Optional[float] = None,
 ) -> Callable[[int, float], tuple[int, float]]:
     """
     Return a function used to compute the number of coloc and the weight associated to one task.
@@ -51,36 +61,27 @@ def weight_fun(
         weight_per_coloc (float): Weight per coloc. If proportional is False, then it is also
             the total weight.
     """
-    match proportional:
-        case True:
-            if weight_per_coloc is None:
-                raise ValueError(
-                    "Task function proportional but no weight per coloc provided."
-                )
-            if total_weight is not None:
-                raise ValueError(
-                    "Task function proportional but total weight provided."
-                )
-        case False:
-            if weight_per_coloc is not None:
-                raise ValueError(
-                    "Task function not proportional but weight per coloc provided."
-                )
-            if total_weight is None:
-                raise ValueError(
-                    "Task function proportional but total weight not provided."
-                )
-        case _:
+    if proportional:
+        if weight_per_coloc is None:
             raise ValueError(
-                f"Expected type bool for argument 'proportional', got {proportional}."
+                "Task function proportional but no weight per coloc provided."
             )
-
+        if total_weight is not None:
+            raise ValueError("Task function proportional but total weight provided.")
+    else:
+        if weight_per_coloc is not None:
+            raise ValueError(
+                "Task function not proportional but weight per coloc provided."
+            )
+        if total_weight is None:
+            raise ValueError(
+                "Task function proportional but total weight not provided."
+            )
     return lambda _, n_coloc_days: general_weight_fun(
         _,
         n_coloc_days=n_coloc_days,
         min_prop=min_prop,
         min_nb_coloc=min_nb_coloc,
-        proportional=proportional,
         weight_per_coloc=weight_per_coloc,
         total_weight=total_weight,
     )
@@ -94,15 +95,16 @@ def need_weekend(available_days: list[bool]) -> bool:
 def less_than_n_consecutive_days_absent(
     available_days: list[bool], n_days: int
 ) -> bool:
-    """Return True if the available days contain less than n consecutive absent days."""
-    occ = -1
-    max_absent_days = 0
-    for k, available in enumerate(available_days):
-        if available:
-            max_absent_days = max(max_absent_days, k - occ - 1)
-            occ = k
-    max_absent_days = max(max_absent_days, 7 - occ - 1)
-    return max_absent_days < n_days
+    """Return True if the available days contain strictly less than n consecutive absent days."""
+    absent_days: int = 0
+    for day in available_days:
+        if day:
+            absent_days = 0
+        else:
+            absent_days += 1
+            if absent_days >= n_days:
+                return False
+    return True
 
 
 class Task:
